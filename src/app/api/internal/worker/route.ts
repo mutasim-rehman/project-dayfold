@@ -7,7 +7,7 @@ export async function POST(request:Request) {
   if(!expected || Buffer.byteLength(supplied)!==Buffer.byteLength(expected) || !timingSafeEqual(Buffer.from(supplied),Buffer.from(expected)))return Response.json({error:"Unauthorized"},{status:401});
   try {
     const db=adminDb();
-    const {error}=await db.rpc("enqueue_morning_editions");if(error)throw error;
+    const {error}=await db.rpc("enqueue_morning_editions_dayfold");if(error)throw error;
     const worked=await runJob();return Response.json({processed:worked?1:0});
   }catch {return Response.json({error:"Worker unavailable"},{status:503});}
 }

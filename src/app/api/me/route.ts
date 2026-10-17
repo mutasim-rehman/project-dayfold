@@ -1,4 +1,4 @@
-import { requireUser, apiError, checkOrigin, limitedJson, rateLimit } from "@/lib/supabase";
+import { requireUser, apiError, checkOrigin, limitedJson, rateLimit, databaseError } from "@/lib/supabase";
 import { defaultPreferences } from "@/lib/domain";
 import { z } from "zod";
 export const dynamic = "force-dynamic";
@@ -12,10 +12,10 @@ const preferences = z.object({
 });
 export async function GET() {
   try {
-    const {db,user}=await requireUser(); const {data,error}=await db.from("profiles").select("*").eq("id",user.id).maybeSingle();
-    if(error) throw error;
-    if(data)await db.from("profiles").update({last_active_at:new Date().toISOString()}).eq("id",user.id);
-    return Response.json({user:{name:user.user_metadata.full_name || user.user_metadata.name || "Reader",email:user.email,is_admin:(process.env.ADMIN_USER_IDS||"").split(",").map(s=>s.trim()).includes(user.id)},preferences:{...defaultPreferences,...data?.preferences},onboarding_complete:data?.onboarding_complete || false},{headers:{"Cache-Control":"private, no-store"}});
+    const {db,user}=await requireUser(); const {data,error}=await db.from("profiles_dayfold").select("preferences,onboarding_complete,last_active_at").eq("id",user.id).maybeSingle();
+    // Identity is independently verified above. Missing application tables must not masquerade as sign-out.
+    if(data)await db.from("profiles_dayfold").update({last_active_at:new Date().toISOString()}).eq("id",user.id);
+    return Response.json({user:{name:user.user_metadata.full_name || user.user_metadata.name || "Reader",email:user.email,is_admin:(process.env.ADMIN_USER_IDS||"").split(",").map(s=>s.trim()).includes(user.id)},preferences:{...defaultPreferences,...data?.preferences},onboarding_complete:data?.onboarding_complete || false,setup_required:!!error},{headers:{"Cache-Control":"private, no-store"}});
   } catch(error) {return apiError(error);}
 }
 export async function PATCH(request: Request) {
@@ -23,7 +23,7 @@ export async function PATCH(request: Request) {
     checkOrigin(request); const {db,user}=await requireUser(); await rateLimit(db,"preferences",60);
     const parsed=preferences.safeParse(await limitedJson(request));
     if(!parsed.success) return Response.json({error:"Please check your reading preferences."},{status:400});
-    const {error}=await db.from("profiles").upsert({id:user.id,preferences:parsed.data,onboarding_complete:true,last_active_at:new Date().toISOString()});
-    if(error) throw error; return Response.json({ok:true});
+    const {error}=await db.from("profiles_dayfold").upsert({id:user.id,preferences:parsed.data,onboarding_complete:true,last_active_at:new Date().toISOString()});
+    if(error) throw databaseError(error); return Response.json({ok:true});
   }catch(error){return apiError(error);}
 }

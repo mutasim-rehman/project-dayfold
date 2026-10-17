@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import { userDb } from "@/lib/supabase";
+import {authFailureCode,incomingOrigin} from "@/lib/auth-origin";
+export const dynamic="force-dynamic";
 export async function GET(request: Request) {
   const url = new URL(request.url); const code = url.searchParams.get("code");
+  const origin=incomingOrigin(request);
+  if(url.searchParams.has("error"))return NextResponse.redirect(`${origin}/?auth_error=denied`);
   if (code) {
     try {
       const db = await userDb(); const {error} = await db.auth.exchangeCodeForSession(code);
-      if (!error) return NextResponse.redirect(new URL("/",url.origin));
-    } catch { /* Show a safe, actionable error without leaking provider content. */ }
+      if (!error) return NextResponse.redirect(`${origin}/`,{headers:{"Cache-Control":"private, no-store"}});
+      return NextResponse.redirect(`${origin}/?auth_error=${authFailureCode(error)}`);
+    } catch { return NextResponse.redirect(`${origin}/?auth_error=exchange`); }
   }
-  return NextResponse.redirect(new URL("/?auth_error=callback",url.origin));
+  return NextResponse.redirect(`${origin}/?auth_error=missing_code`);
 }

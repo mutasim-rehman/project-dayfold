@@ -18,8 +18,8 @@ export type Article = {
   regions: string[]; entities: string[]; cluster_id: string; license_url: string;
   language: string;
 };
-export type EditionItem = Article & { summary: string; reason: string; score: number; translated?: boolean; evidence_hash?:string };
-export type Edition = { id: string; edition_date: string; created_at: string; language: Locale; items: EditionItem[]; status: string; minutes: number; short?: boolean };
+export type EditionItem = Article & { summary: string; reason: string; score: number; translated?: boolean; evidence_hash?:string; recommendation?: import("./recommendations").RankingSignals };
+export type Edition = { id: string; edition_date: string; created_at: string; language: Locale; items: EditionItem[]; status: string; minutes: number; short?: boolean; estimated_minutes?: number };
 export type MemoryCandidate = { operation: "upsert" | "remove"; kind: "topic" | "entity" | "region"; value: string; scope: "ongoing" | "temporary"; explicit: boolean; sensitive: boolean; evidence_quote: string };
 
 export function localDate(timezone: string, now = new Date()) {
@@ -27,36 +27,13 @@ export function localDate(timezone: string, now = new Date()) {
   return ["year", "month", "day"].map(k => parts.find(p => p.type === k)?.value).join("-");
 }
 
-export function rankArticles(articles: Article[], profile: Preferences, feedback: {article_id: string; action: string}[] = [], now = Date.now(), semanticScores:Record<string,number> = {}): EditionItem[] {
-  const seen = new Set(feedback.filter(f => ["read", "less"].includes(f.action)).map(f => f.article_id));
-  const likedTopics=feedback.filter(f=>f.action==="more").flatMap(f=>articles.find(a=>a.id===f.article_id)?.topics||[]);
-  const scored = articles.filter(a => !seen.has(a.id) && Date.parse(a.published_at) <= now + 5 * 60_000).map(a => {
-    const matched = a.topics.filter(t => profile.topics.includes(t));
-    const region = a.regions.some(r => profile.regions.some(p => r.toLowerCase().includes(p.toLowerCase())));
-    const articleText=`${a.title} ${a.excerpt} ${a.body||""}`.toLowerCase();
-    const entity = profile.entities.some(e => e.trim().length>1 && articleText.includes(e.toLowerCase()));
-    const age = Math.max(0, (now - Date.parse(a.published_at)) / 3_600_000);
-    const text = `${a.title} ${a.excerpt}`.toLowerCase();
-    const purposeBoost = profile.purpose === "work" ? Number(/econom|business|policy|industry/.test(text)) : profile.purpose === "learn" ? Number(/explain|research|study|history/.test(text)) : profile.purpose === "explore" ? Number(!matched.length) : 0;
-    const confidencePenalty = profile.uncertainty === "confirmed" && /unconfirmed|rumou?r|alleged/.test(text) ? 2 : 0;
-    const likeBoost=Math.min(2,a.topics.reduce((n,t)=>n+likedTopics.filter(v=>v===t).length*.3,0));
-    const score = matched.length * 3 + Number(region) * 2 + Number(entity) * 4 + Math.exp(-age / 72) * 2 + purposeBoost - confidencePenalty + likeBoost + (semanticScores[a.id]||0)*3;
-    return { ...a, summary: a.excerpt, score, reason: entity ? "A topic or organization you follow" : matched.length ? `Matches your interest in ${matched.join(", ")}` : region ? "Coverage from a region you follow" : "A different perspective to explore" };
-  }).sort((a,b) => b.score - a.score || a.id.localeCompare(b.id));
-  const selected: EditionItem[] = []; const clusters = new Set<string>();
-  const max = Math.min(12, Math.max(3, Math.round(profile.minutes * .8)));
-  const exploration = profile.discovery === "low" ? 0 : profile.discovery === "high" ? 2 : 1;
-  for (const article of scored) {
-    if (clusters.has(article.cluster_id)) continue;
-    if (selected.length >= max - exploration) break;
-    selected.push(article); clusters.add(article.cluster_id);
-  }
-  const discovery = scored.filter(a => !a.topics.some(t => profile.topics.includes(t)));
-  for (const article of [...discovery, ...scored]) {
-    if (selected.length >= max) break;
-    if (!clusters.has(article.cluster_id)) { selected.push(article); clusters.add(article.cluster_id); }
-  }
-  return selected;
+export {rankArticles} from "./recommendations";
+
+// Allowlist the frozen snapshot: database vectors and source bodies are never
+// copied into personalized JSON or sent to the browser, including older editions.
+export function editionItemSnapshot(item: EditionItem): EditionItem {
+  const {id,title,url,source,author,published_at,excerpt,topics,regions,entities,cluster_id,license_url,language,summary,reason,score,translated,evidence_hash,recommendation}=item;
+  return {id,title,url,source,author,published_at,excerpt,topics,regions,entities,cluster_id,license_url,language,summary,reason,score,translated,evidence_hash,recommendation};
 }
 
 export function validateMemory(candidate: MemoryCandidate, message: string) {

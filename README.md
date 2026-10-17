@@ -17,13 +17,21 @@ Copy variable names from `.env.example` into local `.env` and set values locally
 
 ## Supabase setup
 
-1. Review and apply `supabase/migrations/202610170001_initial.sql` in the intended project. It creates new application tables, RLS policies, service-only job/memory functions, and private PDF storage in a transaction.
+1. Review and apply `supabase/migrations/202610170001_initial.sql` in the existing project. All 14 application tables use the `_dayfold` suffix, for example `profiles_dayfold`. RPCs and indexes are also namespaced; PDFs use the private `edition-pdfs-dayfold` bucket. Existing application tables and functions are not modified. RLS and service-only function grants remain in place.
 2. If using the CLI migration helper, `DATABASE_URL` must resolve from this computer. A Supabase **session pooler** connection is suitable when the direct database host requires unavailable IPv6 connectivity. Preserve SSL verification.
-3. `node scripts/migrate.mjs` refuses to apply if it finds conflicting application tables. Review conflicts; do not drop an existing schema to force the script through.
+3. `node scripts/migrate.mjs` refuses to apply if it finds existing Dayfold tables. The SQL also refuses an existing Dayfold bucket; any name collision rolls back the transaction. Unrelated tables do not block installation. Review conflicts; do not drop an existing schema to force the script through.
 4. Enable Google in Supabase Auth. Configure a Google OAuth **web application** client ID/secret, consent audience, Supabase callback URI, and exact local/production redirect URLs. Google service accounts and model API keys do not supply browser OAuth credentials.
 5. Set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and server-only `SUPABASE_SERVICE_ROLE_KEY` in the deployment.
 
+Local OAuth uses `http://localhost:3000/auth/callback`. Allow this exact URL in Supabase Auth URL Configuration. Opening the app on `127.0.0.1` is supported: sign-in redirects to `localhost` **before** creating the PKCE verifier cookie. Use that same tab through the provider return. An optional `APP_URL` selects a different canonical origin; production must use the deployed HTTPS origin and its allowed `/auth/callback` URL. A successful account sign-in is shown independently of whether the application tables have been initialized.
+
 Anonymous users cannot read private records. Authenticated users can read only their own editions, memories, conversations, jobs, and events. Server routes derive identity from `getUser()`, check ownership, and isolate privileged writes. Do not expose service-only SQL functions or worker secrets to the browser.
+
+Supabase Auth is shared across applications in this project. Removing a Dayfold account deletes only Dayfold records/PDFs and signs out the current session; it never deletes the shared Auth user or another application's records. OAuth provider settings are project-wide and should retain the other app's redirect URLs.
+
+The migration discovers pgvector's installed schema from PostgreSQL's extension catalog. It reuses that schema for the embedding column, search RPC type, and distance operator; it does not move or replace an existing extension. If an earlier full-file attempt failed, rerun the corrected complete file so its transaction is applied together.
+
+`SUPABASE_PROJECT_URL` / `SUPABASE_URL` are HTTPS API addresses. `DATABASE_URL` is a PostgreSQL URI used for schema setup. They are not interchangeable; use the project's **Connect → Session pooler** URI for `DATABASE_URL` on IPv4-only networks.
 
 The Supabase plugin was reported added by the user and confirmed installed in the plugin directory. Its SQL tools were not exposed in this execution's callable tool list, so no plugin migration is claimed here.
 

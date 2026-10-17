@@ -8,7 +8,7 @@ try {
   const {Client}=await import('pg');
   const client=new Client({connectionString:process.env.DATABASE_URL,connectionTimeoutMillis:10000,ssl:{rejectUnauthorized:true}});
   await client.connect();result.database=true;
-  const r=await client.query("select to_regclass('public.profiles') is not null as ready");result.schemaReady=r.rows[0].ready;
+  const r=await client.query("select to_regclass('public.profiles_dayfold') is not null and to_regprocedure('public.consume_rate_limit_dayfold(text,integer,integer)') is not null as ready");result.schemaReady=r.rows[0].ready;
   await client.end();
 } catch(e) { result.databaseErrorCode=typeof e.code==='string'&&/^[A-Z0-9_]+$/.test(e.code)?e.code:'CONNECTION_FAILED'; }
 try {
@@ -16,7 +16,7 @@ try {
   const settings=await response.json();result.googleOAuth=!!settings.external?.google;
 }catch{}
 try {
-  const response=await fetch(`${process.env.SUPABASE_URL}/rest/v1/editions?select=id&limit=0`,{headers:{apikey:process.env.SUPABASE_ANON_KEY,Authorization:`Bearer ${process.env.SUPABASE_ANON_KEY}`},signal:AbortSignal.timeout(10000)});
+  const response=await fetch(`${process.env.SUPABASE_URL}/rest/v1/profiles_dayfold?select=id,preferences,onboarding_complete&limit=0`,{headers:{apikey:process.env.SUPABASE_SERVICE_ROLE_KEY,Authorization:`Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`},signal:AbortSignal.timeout(10000)});
   result.schemaViaRest=response.ok;
 }catch{}
 if(process.argv.includes('--model')) {

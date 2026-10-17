@@ -2,6 +2,7 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import {incomingOrigin} from "./auth-origin";
 
 export function publicConfig() {
   const url = process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL;
@@ -27,6 +28,13 @@ export async function requireUser() {
   return { db, user: data.user };
 }
 export class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
+export function databaseError(error: unknown) {
+  const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
+  if (["PGRST202", "PGRST204", "PGRST205", "42P01", "42703", "42883"].includes(code)) {
+    return new ApiError(503,"Dayfold account setup is incomplete. The connected database is missing Dayfold tables, columns, or functions. Ask the administrator to configure the Dayfold database before saving preferences.");
+  }
+  return error;
+}
 export function apiError(error: unknown) {
   if (error instanceof ApiError) return Response.json({error:error.message},{status:error.status});
   // Database/provider errors can contain private request details. Do not echo or log them.
@@ -34,7 +42,7 @@ export function apiError(error: unknown) {
 }
 export function checkOrigin(request: Request) {
   const origin = request.headers.get("origin");
-  if (!origin || origin !== new URL(request.url).origin) throw new ApiError(403,"Request origin is not allowed.");
+  if (!origin || origin !== incomingOrigin(request)) throw new ApiError(403,"Request origin is not allowed.");
 }
 export async function limitedJson(request: Request, max = 16_000): Promise<unknown> {
   if (Number(request.headers.get("content-length") || 0) > max) throw new ApiError(413,"Request is too large.");
@@ -43,7 +51,7 @@ export async function limitedJson(request: Request, max = 16_000): Promise<unkno
   try { return JSON.parse(raw); } catch { throw new ApiError(400,"Invalid request."); }
 }
 export async function rateLimit(db: Awaited<ReturnType<typeof userDb>>, action: string, limit: number, seconds = 3600) {
-  const {data,error} = await db.rpc("consume_rate_limit", {p_action:action,p_limit:limit,p_seconds:seconds});
-  if (error) throw new Error("Rate limit unavailable");
+  const {data,error} = await db.rpc("consume_rate_limit_dayfold", {p_action:action,p_limit:limit,p_seconds:seconds});
+  if (error) throw databaseError(error);
   if (!data) throw new ApiError(429,"You've reached the request limit. Please try again later.");
 }
