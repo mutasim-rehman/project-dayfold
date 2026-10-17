@@ -6,6 +6,8 @@ A React/Node.js personal daily newspaper MVP, with English and Urdu reading, Sup
 
 Use a supported Node.js release (22 or newer) and pnpm. Dependencies are pinned in `package.json` and `pnpm-lock.yaml`.
 
+pnpm 11 settings live in `pnpm-workspace.yaml`. The two optional dependency lifecycle scripts have explicit deny decisions so frozen installs can complete without interactive build approvals in Vercel.
+
 ```sh
 pnpm install --ignore-scripts
 pnpm dev
@@ -22,6 +24,10 @@ Copy variable names from `.env.example` into local `.env` and set values locally
 3. `node scripts/migrate.mjs` refuses to apply if it finds existing Dayfold tables. The SQL also refuses an existing Dayfold bucket; any name collision rolls back the transaction. Unrelated tables do not block installation. Review conflicts; do not drop an existing schema to force the script through.
 4. Enable Google in Supabase Auth. Configure a Google OAuth **web application** client ID/secret, consent audience, Supabase callback URI, and exact local/production redirect URLs. Google service accounts and model API keys do not supply browser OAuth credentials.
 5. Set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and server-only `SUPABASE_SERVICE_ROLE_KEY` in the deployment.
+6. Apply `supabase/migrations/202610170002_admin_panel_analytics.sql` after the initial Dayfold schema. It adds database-backed admin login throttling and a service-only aggregate analytics RPC.
+7. Set the exact server-only variables `Admin_Panel_Name` and `Admin_Panel_Pass` locally and in Vercel. Use a unique, long random password; never prefix either variable with `NEXT_PUBLIC_`. Visit `/admin` to sign in. The signed HttpOnly session expires after 12 hours.
+
+The `/admin` dashboard shows aggregate signup activation, paper/Ask/PDF/source/feedback/change feature use, repeat readers, a 30-day signup funnel, daily activity, and model-token workload. It does not expose names, email addresses, interests, or conversation contents. Reach and repeat use are product signals, not proof of willingness to pay; validate pricing with reader research or an experiment.
 
 Local OAuth uses `http://localhost:3000/auth/callback`. Allow this exact URL in Supabase Auth URL Configuration. Opening the app on `127.0.0.1` is supported: sign-in redirects to `localhost` **before** creating the PKCE verifier cookie. Use that same tab through the provider return. An optional `APP_URL` selects a different canonical origin; production must use the deployed HTTPS origin and its allowed `/auth/callback` URL. A successful account sign-in is shown independently of whether the application tables have been initialized.
 

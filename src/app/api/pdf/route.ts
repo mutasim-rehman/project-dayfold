@@ -9,6 +9,7 @@ export async function POST(request:Request) {
     const {data:edition,error}=await db.from("editions_dayfold").select("id,pdf_path,status").eq("id",parsed.data.edition_id).eq("user_id",user.id).single();if(error || !edition)throw new ApiError(404,"Edition not found.");
     if(edition.status!=="published")throw new ApiError(409,"Your paper is still being prepared.");
     const admin=adminDb();
+    await admin.from("events_dayfold").insert({user_id:user.id,name:"pdf_download_requested",properties:{edition_id:edition.id}});
     if(edition.pdf_path){const {data,error}=await admin.storage.from("edition-pdfs-dayfold").createSignedUrl(edition.pdf_path,60,{download:true});if(error)throw error;return Response.json({url:data.signedUrl});}
     const key=`pdf:${edition.id}`;
     const {data:created,error:jobError}=await admin.from("jobs_dayfold").upsert({user_id:user.id,type:"pdf",key,payload:{edition_id:edition.id}},{onConflict:"key",ignoreDuplicates:true}).select("id,status").maybeSingle();if(jobError)throw jobError;

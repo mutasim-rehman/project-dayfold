@@ -7,6 +7,7 @@ export async function POST(request:Request) {
     const input=z.object({edition_id:z.string().uuid(),article_id:z.string(),language:z.enum(["en","ur"])}).safeParse(await limitedJson(request));if(!input.success)throw new ApiError(400,"Invalid story.");
     const {data:edition}=await db.from("editions_dayfold").select("items,created_at,published_at").eq("id",input.data.edition_id).eq("user_id",user.id).single();
     const baseline=(edition?.items as EditionItem[]|undefined)?.find(a=>a.id===input.data.article_id);if(!baseline)throw new ApiError(404,"Story not found in this edition.");
+    await adminDb().from("events_dayfold").insert({user_id:user.id,name:"change_brief_opened",properties:{edition_id:input.data.edition_id}});
     const cutoff=edition!.published_at||edition!.created_at;
     const {data:original}=await db.from("article_versions_dayfold").select("body,published_at").eq("article_id",baseline.id).eq("content_hash",baseline.evidence_hash||"").maybeSingle();
     const {data:later}=await db.from("article_versions_dayfold").select("article_id,title,published_at,first_seen_at,body,articles:articles_dayfold!inner(url,approved)").eq("articles.approved",true).eq("cluster_id",baseline.cluster_id).gt("first_seen_at",cutoff).neq("content_hash",baseline.evidence_hash||"").limit(5);

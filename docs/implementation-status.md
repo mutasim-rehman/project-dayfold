@@ -5,7 +5,7 @@ Updated: 17 October 2026. This distinguishes working code from live-service vali
 ## Implemented locally
 
 - Next.js/React/TypeScript application and Node route handlers; pnpm dependency lock.
-- Responsive editorial interface: Today, Ask, Archive, ten-question onboarding/preferences, memory review, and a protected analytics view.
+- Responsive editorial interface: Today, Ask, Archive, ten-question onboarding/preferences, memory review, and a separate password-gated `/admin` product analytics dashboard.
 - English/Urdu interface switching, RTL layouts, self-hosted Urdu font and OFL license, accessible control names, reduced motion, dialog keyboard containment.
 - Live, attributed Global Voices preview with source-specific original-text filters and shared public-content caching. Unknown/restricted publisher adapters remain disabled.
 - Google OAuth initiation/callback and Supabase session validation; Google provider reports enabled on the project.
@@ -17,7 +17,7 @@ Updated: 17 October 2026. This distinguishes working code from live-service vali
 - Grounded Ask pipeline with bounded memories/history, lexical/semantic retrieval, source-ID/marker validation, stored conversations, and reviewable memory proposals.
 - Evidence-hash baseline and later-observed article-version comparison for change briefs; insufficient-evidence response when no reliable comparison exists.
 - Print HTML/PDF pipeline with Urdu font embedding, isolated network access, private storage, and authorized signed download requests.
-- Account export/delete routes, memory forgetting tombstones, aggregate staff metrics, and initial product/usage events.
+- Account export/delete routes, memory forgetting tombstones, aggregate product analytics (activation, feature adoption/repeats, activity funnel, and model workload), admin login throttling, and feature-use events.
 
 ## Verified
 

@@ -1,3 +1,9 @@
+storeDir: .pnpm-store
+enableGlobalVirtualStore: false
+verifyDepsBeforeRun: false
+
 allowBuilds:
-  '@google/genai': set this to true or false
-  protobufjs: set this to true or false
+  # The SDK preinstall is a no-op; protobufjs only checks version compatibility.
+  # Their published runtime files work without these lifecycle scripts.
+  '@google/genai': false
+  protobufjs: false

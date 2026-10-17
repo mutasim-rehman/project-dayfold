@@ -1,4 +1,4 @@
-import { requireUser, apiError, checkOrigin, limitedJson, rateLimit, databaseError } from "@/lib/supabase";
+import { requireUser, apiError, checkOrigin, limitedJson, rateLimit, databaseError, adminDb } from "@/lib/supabase";
 import { defaultPreferences } from "@/lib/domain";
 import { z } from "zod";
 export const dynamic = "force-dynamic";
@@ -23,7 +23,11 @@ export async function PATCH(request: Request) {
     checkOrigin(request); const {db,user}=await requireUser(); await rateLimit(db,"preferences",60);
     const parsed=preferences.safeParse(await limitedJson(request));
     if(!parsed.success) return Response.json({error:"Please check your reading preferences."},{status:400});
+    const {data:previous,error:readError}=await db.from("profiles_dayfold").select("onboarding_complete").eq("id",user.id).maybeSingle();
+    if(readError)throw databaseError(readError);
     const {error}=await db.from("profiles_dayfold").upsert({id:user.id,preferences:parsed.data,onboarding_complete:true,last_active_at:new Date().toISOString()});
-    if(error) throw databaseError(error); return Response.json({ok:true});
+    if(error) throw databaseError(error);
+    if(!previous?.onboarding_complete)await adminDb().from("events_dayfold").insert({user_id:user.id,name:"onboarding_completed",properties:{language:parsed.data.language}});
+    return Response.json({ok:true});
   }catch(error){return apiError(error);}
 }

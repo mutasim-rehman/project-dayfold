@@ -12,7 +12,10 @@ export async function POST(request:Request) {
     // ownership is supplied by requireUser, never accepted from the request.
     const {error}=deliberate?await adminDb().from("feedback_dayfold").upsert({...parsed.data,user_id:user.id,created_at:new Date().toISOString()},{onConflict:"user_id,article_id,action"}):await db.from("feedback_dayfold").insert({...parsed.data,user_id:user.id});
     if(error && error.code!=="23505")throw error;
-    if(!error)await adminDb().from("events_dayfold").insert({user_id:user.id,name:"feedback_submitted",properties:{action:parsed.data.action}});
+    if(!error||error.code==="23505"){
+      const eventName=deliberate?"feedback_submitted":parsed.data.action==="read"?"source_link_opened":`story_${parsed.data.action}`;
+      await adminDb().from("events_dayfold").insert({user_id:user.id,name:eventName,properties:{action:parsed.data.action}});
+    }
     return Response.json({ok:true});
   }catch(error){return apiError(error);}
 }

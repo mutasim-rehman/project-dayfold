@@ -8,8 +8,9 @@ import {GET} from "../src/app/api/account/export/route";
 describe("shared Supabase project boundaries",()=>{
   it("keeps runtime table/RPC references consistent with the isolated SQL contract",()=>{
     const sql=readFileSync(new URL("../supabase/migrations/202610170001_initial.sql",import.meta.url),"utf8");
+    const adminSql=readFileSync(new URL("../supabase/migrations/202610170002_admin_panel_analytics.sql",import.meta.url),"utf8");
     const tables=[...sql.matchAll(/create table public\.(\w+)/g)].map(m=>m[1]);
-    const functions=[...sql.matchAll(/create function public\.(\w+)/g)].map(m=>m[1]);
+    const functions=[sql,adminSql].flatMap(source=>[...source.matchAll(/create function public\.(\w+)/g)].map(m=>m[1]));
     expect(tables).toHaveLength(14);expect(tables.every(t=>t.endsWith("_dayfold"))).toBe(true);
     expect(functions.every(f=>f.endsWith("_dayfold"))).toBe(true);
     const walk=(dir:string):string[]=>readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(join(dir,e.name)):[join(dir,e.name)]);
