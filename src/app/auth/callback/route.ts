@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { userDb } from "@/lib/supabase";
-import {authFailureCode,incomingOrigin} from "@/lib/auth-origin";
+import {authFailureCode,incomingOrigin,productionOrigin} from "@/lib/auth-origin";
 export const dynamic="force-dynamic";
 export async function GET(request: Request) {
   const url = new URL(request.url); const code = url.searchParams.get("code");
-  const origin=incomingOrigin(request);
+  // Vercel may expose an internal request hostname. Never redirect a deployed
+  // callback to that host or to an accidentally copied local APP_URL.
+  const origin=process.env.VERCEL === "1" ? productionOrigin : incomingOrigin(request);
   if(url.searchParams.has("error"))return NextResponse.redirect(`${origin}/?auth_error=denied`);
   if (code) {
     try {

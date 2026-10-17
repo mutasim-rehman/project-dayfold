@@ -1,5 +1,16 @@
-import {describe,it,expect} from "vitest";
-import {authOrigin,incomingOrigin,authFailureCode} from "../src/lib/auth-origin";
+import {describe,it,expect,vi,afterEach} from "vitest";
+import {authOrigin,incomingOrigin,authFailureCode,deploymentAuthOrigin,productionOrigin} from "../src/lib/auth-origin";
+afterEach(()=>vi.unstubAllEnvs());
+describe("deployed OAuth origin",()=>{
+  it.each(["https://project-dayfold.vercel.app/", "http://localhost:3000/", "https://preview.vercel.app/"])("uses the public production domain for %s despite a stale APP_URL",(url)=>{
+    vi.stubEnv("VERCEL","1");vi.stubEnv("APP_URL","http://localhost:3000");
+    expect(deploymentAuthOrigin(new Request(url,{headers:{"x-forwarded-host":"evil.example"}}))).toBe(productionOrigin);
+  });
+  it("keeps local development local",()=>{
+    vi.stubEnv("VERCEL","");vi.stubEnv("APP_URL",productionOrigin);
+    expect(deploymentAuthOrigin(new Request("http://127.0.0.1:3000/"))).toBe("http://localhost:3000");
+  });
+});
 describe("OAuth cookie-host consistency",()=>{
   it("canonicalizes the browser's loopback alias before issuing a PKCE cookie",()=>{const request=new Request("http://localhost:3000/api/auth/google",{headers:{host:"127.0.0.1:3000"}});expect(incomingOrigin(request)).toBe("http://127.0.0.1:3000");expect(authOrigin(request)).toBe("http://localhost:3000");});
   it("keeps a canonical localhost request on the same cookie host",()=>{expect(authOrigin(new Request("http://localhost:3000/api/auth/google",{headers:{host:"localhost:3000"}}))).toBe("http://localhost:3000");});

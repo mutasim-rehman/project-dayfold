@@ -1,4 +1,11 @@
 const loopback = new Set(["localhost", "127.0.0.1", "[::1]"]);
+export const productionOrigin = "https://project-dayfold.vercel.app";
+
+/** Deployment identity is server-controlled; never trust forwarded host headers. */
+export function deploymentAuthOrigin(request: Request) {
+  if (process.env.VERCEL === "1") return productionOrigin;
+  return authOrigin(request, process.env.APP_URL);
+}
 
 /** Use one cookie host for OAuth. Next's internal request URL can normalize 127.0.0.1 to localhost. */
 export function incomingOrigin(request: Request) {
