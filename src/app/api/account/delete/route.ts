@@ -1,0 +1,14 @@
+import {requireUser,adminDb,apiError,checkOrigin,limitedJson,ApiError} from "@/lib/supabase";
+export async function POST(request:Request){
+  try {checkOrigin(request);const {db,user}=await requireUser();const input=await limitedJson(request) as {confirmation?:string};if(input.confirmation!=="DELETE")throw new ApiError(400,"Type DELETE to confirm account removal.");
+    const admin=adminDb();
+    // Stop scheduling and prevent ongoing work from obtaining a live profile.
+    const {error:disableError}=await admin.from("profiles").update({onboarding_complete:false,preferences:{memory_enabled:false}}).eq("id",user.id);if(disableError)throw disableError;
+    const {error:cancelError}=await admin.from("jobs").delete().eq("user_id",user.id);if(cancelError)throw cancelError;
+    for(let page=0;page<100;page++){
+      const {data:objects,error}=await admin.storage.from("edition-pdfs").list(user.id,{limit:100});if(error)throw error;if(!objects?.length)break;
+      const {error:removeError}=await admin.storage.from("edition-pdfs").remove(objects.map(o=>`${user.id}/${o.name}`));if(removeError)throw removeError;
+    }
+    const {error}=await admin.auth.admin.deleteUser(user.id);if(error)throw error;await db.auth.signOut();return Response.json({ok:true});
+  }catch(error){return apiError(error);}
+}

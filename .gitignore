@@ -1,0 +1,15 @@
+.env
+problemStatement.pdf
+.env.*
+!.env.example
+node_modules/
+.next/
+.next-build/
+out/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+.vercel/
+tmp/
+.pnpm-store/
